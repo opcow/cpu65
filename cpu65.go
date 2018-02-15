@@ -386,20 +386,22 @@ func (c *CPU) BranchAddr() int {
 	return c.pc + int(int8(c.ins.ops[0])) + 2
 }
 
-// AbsJumpAddr returns the destination of an absolute  jmp/jsr instruction
+// AbsJumpAddr returns the destination of an absolute jmp/jsr instruction
 func (c *CPU) AbsJumpAddr() int {
 	return int(c.ins.ops[0]) | int(c.ins.ops[1])<<8
 }
 
-// TODO indirect jump
+// IndJumpAddr returns the destination of an indrect jmp instruction
+func (c *CPU) IndJumpAddr() int {
+	addr := int(c.ins.ops[0]) | int(c.ins.ops[1])<<8
+	return int(c.mem[addr]) | int(c.mem[addr+1])<<8
+}
 
 // FetchInstr fetches a CPU instuction
 func (c *CPU) FetchInstr() {
 	c.ins.code = int(c.mem[c.pc])
 	c.ins.mnemonic = opcodes[c.ins.code].mnemonic
 	c.ins.length = opcodes[c.ins.code].length
-
 	c.ins.ops = c.mem[c.pc+1 : c.pc+3]
 	c.ins.mode = opcodes[c.ins.code].mode
-	//c.next = c.pc + c.ins.length
 }
