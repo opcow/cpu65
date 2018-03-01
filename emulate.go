@@ -30,8 +30,6 @@ var ExecuteInstr = [256]func(c *CPU){
 	0x99: (*CPU).emuSta,
 	0x81: (*CPU).emuSta,
 	0x91: (*CPU).emuSta,
-	0xca: (*CPU).emuDex,
-	0x88: (*CPU).emuDey,
 	0x10: (*CPU).emuBra,
 	0x30: (*CPU).emuBra,
 	0x50: (*CPU).emuBra,
@@ -77,15 +75,88 @@ var ExecuteInstr = [256]func(c *CPU){
 	0xe1: (*CPU).emuSbc,
 	0xf1: (*CPU).emuSbc,
 	0x60: (*CPU).emuRts,
+	0x6a: (*CPU).emuRor,
+	0x66: (*CPU).emuRor,
+	0x76: (*CPU).emuRor,
+	0x6e: (*CPU).emuRor,
+	0x7e: (*CPU).emuRor,
+	0x9a: (*CPU).emuTxs,
+	0xba: (*CPU).emuTsx,
+	0x48: (*CPU).emuPha,
+	0x68: (*CPU).emuPla,
+	0x08: (*CPU).emuPhp,
+	0x28: (*CPU).emuPlp,
+	0xea: (*CPU).emuNop,
+	0x29: (*CPU).emuAnd,
+	0x25: (*CPU).emuAnd,
+	0x35: (*CPU).emuAnd,
+	0x2d: (*CPU).emuAnd,
+	0x3d: (*CPU).emuAnd,
+	0x39: (*CPU).emuAnd,
+	0x21: (*CPU).emuAnd,
+	0x31: (*CPU).emuAnd,
+	0x09: (*CPU).emuOra,
+	0x05: (*CPU).emuOra,
+	0x15: (*CPU).emuOra,
+	0x0d: (*CPU).emuOra,
+	0x1d: (*CPU).emuOra,
+	0x19: (*CPU).emuOra,
+	0x01: (*CPU).emuOra,
+	0x11: (*CPU).emuOra,
+	0x49: (*CPU).emuEor,
+	0x45: (*CPU).emuEor,
+	0x55: (*CPU).emuEor,
+	0x4d: (*CPU).emuEor,
+	0x5d: (*CPU).emuEor,
+	0x59: (*CPU).emuEor,
+	0x41: (*CPU).emuEor,
+	0x51: (*CPU).emuEor,
+	0x86: (*CPU).emuStx,
+	0x96: (*CPU).emuStx,
+	0x8e: (*CPU).emuStx,
+	0x84: (*CPU).emuSty,
+	0x94: (*CPU).emuSty,
+	0x8c: (*CPU).emuSty,
+	0xaa: (*CPU).emuTax,
+	0xa8: (*CPU).emuTay,
+	0x8a: (*CPU).emuTxa,
+	0x98: (*CPU).emuTya,
+	0xc9: (*CPU).emuCmp,
+	0xc5: (*CPU).emuCmp,
+	0xd5: (*CPU).emuCmp,
+	0xcd: (*CPU).emuCmp,
+	0xdd: (*CPU).emuCmp,
+	0xd9: (*CPU).emuCmp,
+	0xc1: (*CPU).emuCmp,
+	0xd1: (*CPU).emuCmp,
+	0xe0: (*CPU).emuCpx,
+	0xe4: (*CPU).emuCpx,
+	0xec: (*CPU).emuCpx,
+	0xc0: (*CPU).emuCpy,
+	0xc4: (*CPU).emuCpy,
+	0xcc: (*CPU).emuCpy,
+	0xe6: (*CPU).emuInc,
+	0xf6: (*CPU).emuInc,
+	0xee: (*CPU).emuInc,
+	0xfe: (*CPU).emuInc,
+	0xc6: (*CPU).emuDec,
+	0xd6: (*CPU).emuDec,
+	0xce: (*CPU).emuDec,
+	0xde: (*CPU).emuDec,
+	0xe8: (*CPU).emuInx,
+	0xc8: (*CPU).emuIny,
+	0xca: (*CPU).emuDex,
+	0x88: (*CPU).emuDey,
+	0x4c: (*CPU).emuJmp,
+	0x6c: (*CPU).emuJmp,
 }
 
 // Execute execute the current CPU instruction
 func (c *CPU) Execute() (byte, error) {
 	if ExecuteInstr[c.Instr.opcode] == nil {
-		return c.Instr.opcode, fmt.Errorf("looking up opcode: %0x", c.Instr.opcode)
+		return c.Instr.opcode, fmt.Errorf("looking up emulation for instruction: %s", c.Instr.Mnemonic)
 	}
 	ExecuteInstr[c.Instr.opcode](c)
-	c.PC += c.Instr.Length
 	return c.Instr.opcode, nil
 }
 
@@ -95,9 +166,9 @@ func (c *CPU) getEffAddr() *byte {
 	case imm:
 		return &c.Mem[c.PC+1]
 	case zpa:
-		return &c.Mem[c.Instr.Ops[0]]
+		return &c.Mem[c.Instr.Op[0]]
 	case zpx:
-		return &c.Mem[c.Instr.Ops[0]+c.X]
+		return &c.Mem[c.Instr.Op[0]+c.X]
 	case abs:
 		return &c.Mem[c.OpU16()]
 	case abx:
@@ -105,7 +176,7 @@ func (c *CPU) getEffAddr() *byte {
 	case aby:
 		return &c.Mem[c.OpU16()+int(c.Y)]
 	case inx:
-		return &c.Mem[c.Mem16(int(c.Instr.Ops[0]+c.X))]
+		return &c.Mem[c.Mem16(int(c.Instr.Op[0]+c.X))]
 	case iny:
 		return &c.Mem[c.OpU16()+int(c.Y)]
 	case acc:
@@ -128,41 +199,73 @@ func (c *CPU) setNZReg(reg byte) {
 	}
 }
 
+// storage
 func (c *CPU) emuLda() {
 	c.A = *c.getEffAddr()
 	c.setNZReg(c.A)
+	c.PC += c.Instr.Length
 }
 
 func (c *CPU) emuLdx() {
 	c.X = *c.getEffAddr()
 	c.setNZReg(c.X)
+	c.PC += c.Instr.Length
 }
 
 func (c *CPU) emuLdy() {
 	c.Y = *c.getEffAddr()
 	c.setNZReg(c.Y)
+	c.PC += c.Instr.Length
 }
 
 func (c *CPU) emuSta() {
 	*c.getEffAddr() = c.A
+	c.PC += c.Instr.Length
 }
 
+func (c *CPU) emuStx() {
+	*c.getEffAddr() = c.X
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuSty() {
+	*c.getEffAddr() = c.Y
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuTax() {
+	c.X = c.A
+	c.setNZReg(c.X)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuTay() {
+	c.Y = c.A
+	c.setNZReg(c.Y)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuTxa() {
+	c.A = c.X
+	c.setNZReg(c.A)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuTya() {
+	c.A = c.Y
+	c.setNZReg(c.A)
+	c.PC += c.Instr.Length
+}
+
+// registers
 func (c *CPU) emuCld() {
 	c.Status &^= StatusD
+	c.PC += c.Instr.Length
 }
 
 func (c *CPU) emuClc() {
 	c.Status &^= StatusC
-}
-
-func (c *CPU) emuDex() {
-	c.X--
-	c.setNZReg(c.X)
-}
-
-func (c *CPU) emuDey() {
-	c.Y--
-	c.setNZReg(c.Y)
+	c.PC += c.Instr.Length
 }
 
 func (c *CPU) emuBra() {
@@ -187,19 +290,30 @@ func (c *CPU) emuBra() {
 		status = (c.Status & StatusZ) != 0
 	}
 	if status {
-		c.PC += int(int8(c.Instr.Ops[0]))
+		c.PC += c.Instr.Length + int(int8(c.Instr.Op[0]))
+	} else {
+		c.PC += c.Instr.Length
 	}
 }
 
 func (c *CPU) emuJsr() {
 	c.Push16(int16(c.PC + 2))
-	c.PC = c.OpU16() - c.Instr.Length
+	c.PC = c.OpU16()
+}
+
+func (c *CPU) emuJmp() {
+	if c.Instr.Mode == abs {
+		c.PC = c.OpU16()
+	} else {
+		a := c.OpU16()
+		c.PC = int(c.Mem[a]) + int(c.Mem[a])<<8
+	}
 }
 
 func (c *CPU) emuBit() {
 	var n byte
 	if c.Instr.opcode == 0x24 {
-		n = c.Mem[c.Instr.Ops[0]]
+		n = c.Mem[c.Instr.Op[0]]
 	} else {
 		n = c.Mem[c.OpU16()]
 	}
@@ -209,32 +323,10 @@ func (c *CPU) emuBit() {
 	} else {
 		c.Status &^= StatusZ
 	}
+	c.PC += c.Instr.Length
 }
 
-func (c *CPU) emuLsr() {
-	var bit0 byte
-	addr := c.getEffAddr()
-	bit0 = *addr & 1
-	*addr >>= 1
-	c.Status |= bit0
-}
-
-func (c *CPU) emuAsl() {
-	var bit7 byte
-	addr := c.getEffAddr()
-	bit7 = *addr & (1 << 7)
-	*addr <<= 1
-	c.Status |= bit7 >> 7
-}
-
-func (c *CPU) emuRol() {
-	addr := c.getEffAddr()
-	bit7 := *addr & (1 << 7)
-	*addr <<= 1
-	c.Status |= bit7 >> 7
-	*addr |= c.Status & StatusC
-}
-
+// add and subtract TODO: BCD
 func (c *CPU) emuAdc() {
 	n := int(c.A) + int(*c.getEffAddr())
 	if int8(n) < -128 || int8(n) > 127 {
@@ -248,6 +340,7 @@ func (c *CPU) emuAdc() {
 		c.Status &^= StatusC
 	}
 	c.A = byte(n)
+	c.PC += c.Instr.Length
 }
 
 func (c *CPU) emuSbc() {
@@ -263,11 +356,187 @@ func (c *CPU) emuSbc() {
 		c.Status &^= StatusC
 	}
 	c.A = byte(n)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuInc() {
+	m := c.getEffAddr()
+	*m++
+	c.setNZReg(*m)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuDec() {
+	m := c.getEffAddr()
+	*m--
+	c.setNZReg(*m)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuInx() {
+	c.X++
+	c.setNZReg(c.X)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuIny() {
+	c.Y++
+	c.setNZReg(c.Y)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuDex() {
+	c.X--
+	c.setNZReg(c.X)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuDey() {
+	c.Y--
+	c.setNZReg(c.Y)
+	c.PC += c.Instr.Length
+}
+
+// compare
+func (c *CPU) emuCmp() {
+	r := c.A - *c.getEffAddr()
+	c.setNZReg(r)
+	if r >= 0 {
+		c.Status |= StatusC
+	} else {
+		c.Status &^= StatusC
+	}
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuCpx() {
+	r := c.X - *c.getEffAddr()
+	c.setNZReg(r)
+	if r >= 0 {
+		c.Status |= StatusC
+	} else {
+		c.Status &^= StatusC
+	}
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuCpy() {
+	r := c.Y - *c.getEffAddr()
+	c.setNZReg(r)
+	if r >= 0 {
+		c.Status |= StatusC
+	} else {
+		c.Status &^= StatusC
+	}
+	c.PC += c.Instr.Length
+}
+
+// bitwise ops
+func (c *CPU) emuAnd() {
+	c.A &= *c.getEffAddr()
+	c.setNZReg(c.A)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuOra() {
+	c.A |= *c.getEffAddr()
+	c.setNZReg(c.A)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuEor() {
+	c.A ^= *c.getEffAddr()
+	c.setNZReg(c.A)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuLsr() {
+	var bit0 byte
+	addr := c.getEffAddr()
+	bit0 = *addr & 1
+	*addr >>= 1
+	c.Status |= bit0
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuAsl() {
+	var bit7 byte
+	addr := c.getEffAddr()
+	bit7 = *addr & (1 << 7)
+	*addr <<= 1
+	c.Status |= bit7 >> 7
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuRol() {
+	addr := c.getEffAddr()
+	bit7 := *addr & (1 << 7)
+	*addr <<= 1
+	c.Status |= bit7 >> 7
+	*addr |= c.Status & StatusC
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuRor() {
+	addr := c.getEffAddr()
+	bit0 := *addr & (1 << 0)
+	*addr >>= 1
+	c.Status |= bit0
+	*addr |= c.Status & (StatusC << 7)
+	c.PC += c.Instr.Length
+}
+
+// stack instructions
+func (c *CPU) emuPha() {
+	c.stack[c.sp] = c.A
+	c.sp--
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuPla() {
+	c.sp++
+	c.A = c.stack[c.sp]
+	c.setNZReg(c.A)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuTxs() {
+	c.sp = c.X
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuTsx() {
+	c.X = c.sp
+	c.setNZReg(c.X)
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuPhp() {
+	c.stack[c.sp] = c.Status
+	c.sp--
+	c.PC += c.Instr.Length
+}
+
+func (c *CPU) emuPlp() {
+	c.sp++
+	c.Status = c.stack[c.sp]
+	c.PC += c.Instr.Length
 }
 
 func (c *CPU) emuRts() {
 	c.PC = c.Pop16() + 1
 }
 
+func (c *CPU) emuRti() {
+	c.Status = c.stack[c.sp+1]
+	c.sp++
+	c.PC = c.Pop16() + 1
+}
+
 func (c *CPU) emuBrk() {
+	c.PC += 2
+}
+
+func (c *CPU) emuNop() {
+	c.PC += c.Instr.Length
 }
