@@ -54,12 +54,13 @@ func (c *CPU) Result() string {
 	}
 }
 
-type CpuStatus byte
+// CPUStatus used to represent the status register as a string
+type CPUStatus byte
 
-func (c CpuStatus) String() string {
+func (c CPUStatus) String() string {
 	st := [8]byte{'-', '-', '-', '-', '-', '-', '-', '-'}
 	s := [8]byte{'N', 'V', 'U', 'B', 'D', 'I', 'Z', 'C'}
-	b := CpuStatus(1 << 7)
+	b := CPUStatus(1 << 7)
 	for i := 0; i < 8; i++ {
 		if c&b != 0 {
 			st[i] = s[i]
