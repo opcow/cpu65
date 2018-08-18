@@ -256,7 +256,7 @@ func (c *CPU) OpU16() int {
 
 // Mem16 returns the 16-bit unsigned value from memory as an int
 func (c *CPU) Mem16(a int) int {
-	return int(c.Mem[a]) | int(c.Mem[a])<<8
+	return int(c.Mem[a]) | int(c.Mem[a+1])<<8
 }
 
 // Push16 pushes a 16-bit value onto the stack
@@ -283,7 +283,7 @@ func (c *CPU) absJumpAddr() int {
 	return int(c.Instr.Op[0]) | int(c.Instr.Op[1])<<8
 }
 
-// imdJumpAddr returns the destination of an imdrect jmp instruction
+// indJumpAddr returns the destination of an imdrect jmp instruction
 func (c *CPU) imdJumpAddr() int {
 	addr := int(c.Instr.Op[0]) | int(c.Instr.Op[1])<<8
 	return int(c.Mem[addr]) | int(c.Mem[addr+1])<<8
